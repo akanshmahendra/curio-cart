@@ -1,8 +1,8 @@
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
-import { ILoginRequest, IRegisterRequest } from '../models/auth';
+import { ILoginRequest, ILoginResponse, IRegisterRequest } from '../models/auth';
 import { Auth } from '../services/auth';
 import { inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, pipe } from 'rxjs';
 import { jwtDecode } from '../utils/jwt-decode';
 
 type AuthState = {
@@ -23,23 +23,30 @@ export const AuthStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
   withMethods((authStore, authService = inject(Auth)) => ({
-    async login(payload: ILoginRequest): Promise<void> {
+    login(payload: ILoginRequest) {
       patchState(authStore, { isLoading: true });
-      const response = await firstValueFrom(authService.login(payload));
-      patchState(authStore, {
-        token: response.token,
-        userId: jwtDecode(response.token).user,
-        isLoading: false,
-        error: null,
-      });
+      authService.login(payload).subscribe(
+        pipe((response: ILoginResponse) => {
+          const decodedToken: any = jwtDecode(response.token);
+          patchState(authStore, {
+            token: response.token,
+            userId: decodedToken.userId,
+            isLoading: false,
+            error: null,
+          });
+        }),
+      );
     },
-    async register(payload: IRegisterRequest): Promise<void> {
+    register(payload: IRegisterRequest) {
       patchState(authStore, { isLoading: true });
-      const response = await firstValueFrom(authService.register(payload));
-      patchState(authStore, {
-        isLoading: false,
-        error: null,
-      });
+      authService.register(payload).subscribe(
+        pipe((response: unknown) => {
+          patchState(authStore, {
+            isLoading: false,
+            error: null,
+          });
+        }),
+      );
     },
   })),
 );
